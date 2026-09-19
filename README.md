@@ -36,8 +36,11 @@ Os status ficam definidos em `status.py` (e no `CHECK` do `schema.sql`).
 3. Configure a senha do banco em db.py (ou defina a variável de ambiente DB_PASSWORD):
    password="estoque"
 
-4. Carregue a planilha de inventário:
-   python importar_equipamentos.py
+4. Prepare e carregue a planilha de inventário:
+   A planilha da escola **não faz parte deste repositório** (ela lista os números de série dos aparelhos).
+   Use a sua própria planilha, no formato descrito em "Formato da planilha" abaixo, salva na pasta do projeto:
+   python importar_equipamentos.py minha_planilha.xlsx
+   Sem informar o nome do arquivo, o script procura por RELACAO_INVENTARIO_EDITADO.xlsx.
    O script mostra um relatório de conferência (séries repetidas, aparelhos sem série, status em branco).
 
 5. (Opcional) Troque `NOME_ESCOLA` em app.py e coloque o logo da escola em static/logo.jpeg.
@@ -48,8 +51,24 @@ Os status ficam definidos em `status.py` (e no `CHECK` do `schema.sql`).
 7. Acesse no navegador:
    http://localhost:5000
 
-## Importante sobre a planilha
-- Cada aba vira um **carrinho**: "N - Carrinho 1" (notebook, Carrinho 1), "Tablet - Acessa" (tablet, Acessa) etc.
-- Linhas com STATUS em branco entram como **COMPLETO** (`STATUS_PADRAO` em importar_equipamentos.py).
-- Se já houver dados no banco, o importador **não apaga nada** sem o parâmetro `--substituir`
-  (que também cria a tabela `equipamentos_backup` antes de recarregar).
+## Formato da planilha
+O importador lê um arquivo .xlsx com **uma aba por carrinho (ou local)**:
+
+- **Nome da aba:** `Tipo - Carrinho`. Exemplos: "N - Carrinho 1" (notebook, carrinho "Carrinho 1") e
+  "Tablet - Acessa" (tablet, carrinho "Acessa"). Se o nome da aba ou o título na célula A1 contiver "Tablet",
+  os aparelhos são tablets; caso contrário, são notebooks. Sem o " - " no nome, a aba inteira vira o carrinho.
+- **Cabeçalho:** uma linha (dentro das 14 primeiras da aba) com as colunas **Nº, SÉRIE, EQUIPAMENTO, STATUS e OBSERVAÇÃO**.
+  Linhas de título acima do cabeçalho são ignoradas. SÉRIE e EQUIPAMENTO são obrigatórias; as demais são opcionais.
+- **Nº:** número do aparelho na plataforma. Pode ser um número ou uma fórmula; se não for número,
+  o script numera em sequência (1, 2, 3...) dentro da aba.
+- **SÉRIE:** código de identificação do aparelho. Pode ficar vazia ou com "-".
+- **EQUIPAMENTO:** marca ou modelo.
+- **STATUS:** completo, funcional, em análise, reparo, não funcional ou desaparecido (maiúsculas e acentos não importam).
+  Se estiver em branco, o aparelho entra como **COMPLETO** (`STATUS_PADRAO` em importar_equipamentos.py).
+  Qualquer outro valor interrompe a importação e o script informa a aba e a linha para corrigir.
+- **OBSERVAÇÃO:** texto livre (teclas faltando, tela trincada, qualquer dano).
+
+## Recarregar a planilha
+Se já houver dados no banco, o importador **não apaga nada** sem o parâmetro `--substituir`
+(que também cria a tabela `equipamentos_backup` antes de recarregar). Cuidado: recarregar descarta as
+alterações feitas pelo sistema web depois da primeira carga.
