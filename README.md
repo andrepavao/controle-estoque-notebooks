@@ -38,9 +38,12 @@ Os status ficam definidos em `status.py` (e no `CHECK` do `schema.sql`).
 
 4. Prepare e carregue a planilha de inventário:
    A planilha da escola **não faz parte deste repositório** (ela lista os números de série dos aparelhos).
-   Use a sua própria planilha, no formato descrito em "Formato da planilha" abaixo, salva na pasta do projeto:
+   Use a sua própria planilha, no formato descrito em "Formato da planilha" abaixo, salva na pasta do projeto.
+   O arquivo `modelo_planilha.xlsx` é um modelo com dados fictícios: copie-o, apague os exemplos e preencha com os seus dados.
    python importar_equipamentos.py minha_planilha.xlsx
    Sem informar o nome do arquivo, o script procura por RELACAO_INVENTARIO_EDITADO.xlsx.
+   Para só conhecer o sistema, importe o próprio modelo (`python importar_equipamentos.py modelo_planilha.xlsx`)
+   em um banco de teste. Não importe o modelo em um banco que já tenha dados reais.
    O script mostra um relatório de conferência (séries repetidas, aparelhos sem série, status em branco).
 
 5. (Opcional) Troque `NOME_ESCOLA` em app.py e coloque o logo da escola em static/logo.jpeg.
@@ -52,7 +55,7 @@ Os status ficam definidos em `status.py` (e no `CHECK` do `schema.sql`).
    http://localhost:5000
 
 ## Formato da planilha
-O importador lê um arquivo .xlsx com **uma aba por carrinho (ou local)**:
+O importador lê um arquivo .xlsx com **uma aba por carrinho (ou local)**. Veja o exemplo em `modelo_planilha.xlsx`:
 
 - **Nome da aba:** `Tipo - Carrinho`. Exemplos: "N - Carrinho 1" (notebook, carrinho "Carrinho 1") e
   "Tablet - Acessa" (tablet, carrinho "Acessa"). Se o nome da aba ou o título na célula A1 contiver "Tablet",
