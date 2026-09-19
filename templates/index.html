@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Controle de Estoque de Notebooks — {{ nome_escola }}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', sans-serif; background: #f0f4f8; color: #333; }
+    header {
+      background: #1a3a5c; color: white;
+      padding: 20px 40px; display: flex; align-items: center; gap: 20px;
+    }
+    header img { height: 70px; }
+    header h1 { font-size: 1.6rem; }
+    header p  { font-size: 0.9rem; opacity: 0.8; }
+    .container { max-width: 1200px; margin: 30px auto; padding: 0 20px; }
+
+    /* Cartões-resumo por status */
+    .resumo { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 20px; }
+    .card {
+      background: white; border: 2px solid transparent; border-radius: 10px; padding: 14px 16px;
+      text-align: left; cursor: pointer; font-family: inherit;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    .card:hover { border-color: #b8c9dc; }
+    .card.ativo { border-color: #1a3a5c; }
+    .card .n { font-size: 1.8rem; font-weight: bold; color: #1a3a5c; }
+    .card .r { font-size: 0.85rem; color: #555; }
+
+    /* Filtros */
+    .filtros { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
+    .filtros input, .filtros select {
+      padding: 10px 14px; border: 1px solid #ccc; border-radius: 8px;
+      font-size: 0.95rem; background: white; font-family: inherit;
+    }
+    .filtros input { flex: 1; min-width: 220px; }
+    button.novo {
+      background: #1a6e3c; color: white; border: none;
+      padding: 10px 18px; border-radius: 8px; cursor: pointer; font-size: 0.95rem;
+    }
+    .contagem { font-size: 0.85rem; color: #666; margin-bottom: 8px; }
+
+    .tabela-wrap { overflow-x: auto; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    table { width: 100%; border-collapse: collapse; background: white; }
+    thead { background: #1a3a5c; color: white; }
+    th, td { padding: 12px 16px; text-align: left; vertical-align: top; }
+    tr:nth-child(even) { background: #f7f9fc; }
+    tr:hover { background: #eef3fa; }
+    td.serie { font-family: Consolas, monospace; white-space: nowrap; }
+    td.obs { max-width: 320px; font-size: 0.9rem; }
+    .muted { color: #888; font-size: 0.8rem; }
+    .alerta { color: #b45309; font-size: 0.75rem; display: block; }
+
+    .badge { padding: 4px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: bold; white-space: nowrap; }
+    .badge.completo      { background: #d4edda; color: #155724; }
+    .badge.funcional     { background: #d1ecf1; color: #0c5460; }
+    .badge.em_analise    { background: #fff3cd; color: #856404; }
+    .badge.reparo        { background: #ffe5d0; color: #8a4b08; }
+    .badge.nao_funcional { background: #f8d7da; color: #721c24; }
+    .badge.desaparecido  { background: #343a40; color: #fff; }
+
+    button.editar {
+      background: #1a3a5c; color: white; border: none;
+      padding: 7px 16px; border-radius: 6px; cursor: pointer; font-size: 0.85rem;
+    }
+
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 100;
+    }
+    .modal-overlay.ativo { display: flex; }
+    .modal {
+      background: white; border-radius: 12px; padding: 30px;
+      max-width: 480px; width: 92%; max-height: 92vh; overflow-y: auto;
+    }
+    .modal h2 { margin-bottom: 4px; color: #1a3a5c; }
+    .modal .sub { font-size: 0.85rem; color: #666; margin-bottom: 14px; }
+    .modal label { display: block; margin-top: 12px; font-size: 0.85rem; font-weight: 600; }
+    .modal input, .modal select, .modal textarea {
+      width: 100%; margin-top: 4px; padding: 9px 12px;
+      border: 1px solid #ccc; border-radius: 8px; font-size: 0.95rem; font-family: inherit;
+    }
+    .modal input:disabled { background: #f1f1f1; color: #777; }
+    .modal textarea { min-height: 80px; resize: vertical; }
+    .modal .desc { font-size: 0.8rem; color: #555; margin-top: 4px; min-height: 1.1em; }
+    .modal .erro { color: #721c24; font-size: 0.85rem; margin-top: 10px; min-height: 1.1em; }
+    .modal .botoes { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
+    .modal button { padding: 10px 26px; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; }
+    .modal button.salvar { background: #1a3a5c; color: white; }
+    .modal button.cancelar { background: #e2e8f0; color: #333; }
+
+    .toast {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      background: #1a3a5c; color: white; padding: 12px 22px; border-radius: 8px;
+      opacity: 0; pointer-events: none; transition: opacity .25s; z-index: 200;
+    }
+    .toast.ativo { opacity: 1; }
+  </style>
+</head>
+<body>
+
+<header>
+  {% if tem_logo %}<img src="{{ url_for('static', filename='logo.jpeg') }}" alt="Logo">{% endif %}
+  <div>
+    <h1>Controle de Estoque de Notebooks</h1>
+    <p>{{ nome_escola }} — Inventário de equipamentos</p>
+  </div>
+</header>
+
+<div class="container">
+  <div class="resumo" id="resumo"></div>
+
+  <div class="filtros">
+    <input type="text" id="busca" placeholder="Buscar série, nº, observação...">
+    <select id="filtro-tipo">
+      <option value="">Todos os tipos</option>
+      <option value="NOTEBOOK">Notebooks</option>
+      <option value="TABLET">Tablets</option>
+    </select>
+    <select id="filtro-carrinho"><option value="">Todos os carrinhos</option></select>
+    <select id="filtro-status"></select>
+    <button class="novo" onclick="abrirModal(null)">+ Novo equipamento</button>
+  </div>
+  <div class="contagem" id="contagem"></div>
+
+  <div class="tabela-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Nº</th><th>Carrinho</th><th>Série</th><th>Equipamento</th>
+          <th>Status</th><th>Observação</th><th>Atualizado</th><th>Ação</th>
+        </tr>
+      </thead>
+      <tbody id="tabela-equipamentos"></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal">
+    <h2 id="modal-titulo"></h2>
+    <p class="sub" id="modal-sub"></p>
+
+    <div id="grupo-local">
+      <label>Tipo
+        <select id="f-tipo">
+          <option value="NOTEBOOK">Notebook</option>
+          <option value="TABLET">Tablet</option>
+        </select>
+      </label>
+      <label>Carrinho (local)
+        <input type="text" id="f-carrinho" list="lista-carrinhos" placeholder="Ex.: Carrinho 1">
+        <datalist id="lista-carrinhos"></datalist>
+      </label>
+    </div>
+
+    <label>Série
+      <input type="text" id="f-serie" placeholder="Deixe vazio se o aparelho não tiver série">
+    </label>
+    <label>Equipamento (marca ou modelo)
+      <input type="text" id="f-equipamento" list="lista-equipamentos">
+      <datalist id="lista-equipamentos"></datalist>
+    </label>
+    <label>Status
+      <select id="f-status"></select>
+    </label>
+    <p class="desc" id="f-status-desc"></p>
+    <label>Observação
+      <textarea id="f-obs" placeholder="Teclas faltando, tela trincada, qualquer dano..."></textarea>
+    </label>
+
+    <p class="erro" id="modal-erro"></p>
+    <div class="botoes">
+      <button class="cancelar" onclick="fecharModal()">Cancelar</button>
+      <button class="salvar" onclick="salvar()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  // Lista de status vinda do servidor (status.py)
+  const STATUS_LISTA = {{ status_lista|tojson }};
+  const STATUS = Object.fromEntries(STATUS_LISTA.map(s => [s.codigo, s]));
+  const TIPOS = { NOTEBOOK: "Notebook", TABLET: "Tablet" };
+
+  let todos = [];
+  let editandoId = null;
+
+  const el = id => document.getElementById(id);
+
+  function esc(texto) {
+    return String(texto ?? "").replace(/[&<>"']/g, c =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+  function norm(texto) {
+    return String(texto ?? "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  }
+
+  async function carregar() {
+    const res = await fetch("/equipamentos");
+    todos = await res.json();
+    montarCarrinhos();
+    montarListasModal();
+    renderizar();
+  }
+
+  /* ---------- Filtros ---------- */
+  function montarCarrinhos() {
+    const tipo = el("filtro-tipo").value;
+    const atual = el("filtro-carrinho").value;
+    const nomes = [...new Set(todos.filter(e => !tipo || e.tipo === tipo).map(e => e.carrinho))];
+    el("filtro-carrinho").innerHTML = '<option value="">Todos os carrinhos</option>' +
+      nomes.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join("");
+    if (nomes.includes(atual)) el("filtro-carrinho").value = atual;
+  }
+
+  function filtrar(ignorarStatus) {
+    const termo = norm(el("busca").value);
+    const tipo = el("filtro-tipo").value;
+    const carrinho = el("filtro-carrinho").value;
+    const status = el("filtro-status").value;
+    return todos.filter(e => {
+      if (tipo && e.tipo !== tipo) return false;
+      if (carrinho && e.carrinho !== carrinho) return false;
+      if (!ignorarStatus && status) {
+        if (status === "DISPONIVEL") { if (!STATUS[e.status].disponivel) return false; }
+        else if (e.status !== status) return false;
+      }
+      if (termo) {
+        const texto = norm([e.numero, e.serie, e.equipamento, e.observacao, e.carrinho].join(" "));
+        if (!texto.includes(termo)) return false;
+      }
+      return true;
+    });
+  }
+
+  function montarSelectStatus() {
+    el("filtro-status").innerHTML = '<option value="">Todos os status</option>' +
+      '<option value="DISPONIVEL">Disponíveis para uso (Completo + Funcional)</option>' +
+      STATUS_LISTA.map(s => `<option value="${s.codigo}">${esc(s.rotulo)}</option>`).join("");
+    el("f-status").innerHTML = STATUS_LISTA.map(s =>
+      `<option value="${s.codigo}">${esc(s.rotulo)}</option>`).join("");
+  }
+
+  /* ---------- Renderização ---------- */
+  function renderizar() {
+    renderizarResumo(filtrar(true));
+    const lista = filtrar(false);
+    el("contagem").textContent = `Exibindo ${lista.length} de ${todos.length} equipamentos`;
+
+    el("tabela-equipamentos").innerHTML = lista.map(e => {
+      const st = STATUS[e.status];
+      const serie = e.serie
+        ? esc(e.serie) + (e.serie_duplicada ? '<span class="alerta">⚠ série repetida no estoque</span>' : "")
+        : '<span class="muted">sem série</span>';
+      return `
+        <tr>
+          <td>${e.numero}</td>
+          <td>${esc(e.carrinho)}<br><span class="muted">${TIPOS[e.tipo]}</span></td>
+          <td class="serie">${serie}</td>
+          <td>${esc(e.equipamento)}</td>
+          <td><span class="badge ${e.status.toLowerCase()}" title="${esc(st.descricao)}">${esc(st.rotulo)}</span></td>
+          <td class="obs">${e.observacao ? esc(e.observacao) : "—"}</td>
+          <td><span class="muted">${esc(e.atualizado_em)}</span></td>
+          <td><button class="editar" onclick="abrirModal(${e.id})">Editar</button></td>
+        </tr>`;
+    }).join("") || '<tr><td colspan="8" style="text-align:center;padding:30px;color:#888">Nenhum equipamento encontrado.</td></tr>';
+  }
+
+  function renderizarResumo(base) {
+    const cont = {};
+    base.forEach(e => cont[e.status] = (cont[e.status] || 0) + 1);
+    const disponiveis = STATUS_LISTA.filter(s => s.disponivel).reduce((t, s) => t + (cont[s.codigo] || 0), 0);
+    const atual = el("filtro-status").value;
+    const cartoes = [
+      { valor: "", rotulo: "Total", n: base.length },
+      { valor: "DISPONIVEL", rotulo: "Disponíveis para uso", n: disponiveis },
+      ...STATUS_LISTA.filter(s => !s.disponivel).map(s => ({ valor: s.codigo, rotulo: s.rotulo, n: cont[s.codigo] || 0 })),
+    ];
+    el("resumo").innerHTML = cartoes.map(c => `
+      <button class="card ${atual === c.valor ? "ativo" : ""}" data-valor="${c.valor}">
+        <div class="n">${c.n}</div><div class="r">${esc(c.rotulo)}</div>
+      </button>`).join("");
+    el("resumo").querySelectorAll(".card").forEach(b => b.addEventListener("click", () => {
+      el("filtro-status").value = b.dataset.valor;
+      renderizar();
+    }));
+  }
+
+  /* ---------- Modal (editar / novo) ---------- */
+  function montarListasModal() {
+    const unicos = campo => [...new Set(todos.map(e => e[campo]).filter(Boolean))];
+    el("lista-carrinhos").innerHTML = unicos("carrinho").map(v => `<option value="${esc(v)}">`).join("");
+    el("lista-equipamentos").innerHTML = unicos("equipamento").map(v => `<option value="${esc(v)}">`).join("");
+  }
+
+  function descricaoStatus() {
+    el("f-status-desc").textContent = STATUS[el("f-status").value].descricao;
+  }
+
+  function abrirModal(id) {
+    editandoId = id;
+    el("modal-erro").textContent = "";
+    const e = id ? todos.find(x => x.id === id) : null;
+
+    el("modal-titulo").textContent = e ? `Equipamento nº ${e.numero}` : "Novo equipamento";
+    el("modal-sub").textContent = e
+      ? `${TIPOS[e.tipo]} — ${e.carrinho}`
+      : "O número (Nº) segue a sequência do carrinho escolhido.";
+    el("grupo-local").style.display = e ? "none" : "block";
+
+    el("f-tipo").value = e ? e.tipo : "NOTEBOOK";
+    el("f-carrinho").value = "";
+    el("f-serie").value = e ? (e.serie || "") : "";
+    el("f-equipamento").value = e ? e.equipamento : "";
+    el("f-status").value = e ? e.status : "COMPLETO";
+    el("f-obs").value = e ? (e.observacao || "") : "";
+    descricaoStatus();
+    el("modal-overlay").classList.add("ativo");
+  }
+
+  function fecharModal() {
+    el("modal-overlay").classList.remove("ativo");
+  }
+
+  async function salvar() {
+    const dados = {
+      tipo: el("f-tipo").value,
+      carrinho: el("f-carrinho").value,
+      serie: el("f-serie").value,
+      equipamento: el("f-equipamento").value,
+      status: el("f-status").value,
+      observacao: el("f-obs").value,
+    };
+    const url = editandoId ? `/equipamentos/${editandoId}` : "/equipamentos";
+    const res = await fetch(url, {
+      method: editandoId ? "PUT" : "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(dados),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      el("modal-erro").textContent = data.erro;
+      return;
+    }
+    fecharModal();
+    avisar(data.mensagem);
+    carregar();
+  }
+
+  function avisar(msg) {
+    el("toast").textContent = msg;
+    el("toast").classList.add("ativo");
+    setTimeout(() => el("toast").classList.remove("ativo"), 2500);
+  }
+
+  /* ---------- Eventos ---------- */
+  el("busca").addEventListener("input", renderizar);
+  el("filtro-status").addEventListener("change", renderizar);
+  el("filtro-carrinho").addEventListener("change", renderizar);
+  el("filtro-tipo").addEventListener("change", () => { montarCarrinhos(); renderizar(); });
+  el("f-status").addEventListener("change", descricaoStatus);
+  el("modal-overlay").addEventListener("click", ev => { if (ev.target.id === "modal-overlay") fecharModal(); });
+
+  montarSelectStatus();
+  carregar();
+</script>
+</body>
+</html>
